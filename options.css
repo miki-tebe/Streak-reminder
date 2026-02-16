@@ -1,13 +1,48 @@
 :root {
-  --bg: #f5f7fb;
-  --panel: #ffffff;
-  --text: #102033;
-  --muted: #4c6078;
-  --border: #d7dfeb;
-  --accent: #1967d2;
-  --accent-soft: #e8f0fe;
-  --danger: #b3261e;
-  --warning: #8a4b00;
+  color-scheme: light dark;
+  --bg: #f3f0e9;
+  --bg-2: #e9e2d4;
+  --surface: #fffaf1;
+  --surface-2: #f4ecdf;
+  --text: #201a13;
+  --muted: #6a5d4c;
+  --border: #cebfa8;
+  --accent: #c05324;
+  --accent-2: #165f64;
+  --accent-ink: #fff5ea;
+  --danger: #a1362b;
+  --danger-bg: #ffeceb;
+  --danger-border: #e6b1ac;
+  --warning: #81531d;
+  --warning-bg: #fff1df;
+  --warning-border: #e8bf8f;
+  --row-active: #fff5ea;
+  --shadow: 0 18px 36px rgba(32, 26, 19, 0.14);
+  --outline: 2px solid rgba(192, 83, 36, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12100d;
+    --bg-2: #1c1813;
+    --surface: #1f1a15;
+    --surface-2: #2a231d;
+    --text: #f8ecda;
+    --muted: #bfac94;
+    --border: #4c3f31;
+    --accent: #ff935f;
+    --accent-2: #63c4c0;
+    --accent-ink: #1a1009;
+    --danger: #ffb2ab;
+    --danger-bg: #321c1a;
+    --danger-border: #6d403d;
+    --warning: #ffd6a1;
+    --warning-bg: #322615;
+    --warning-border: #735431;
+    --row-active: #33241a;
+    --shadow: none;
+    --outline: 2px solid rgba(255, 147, 95, 0.55);
+  }
 }
 
 * {
@@ -16,53 +51,98 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
   padding: 20px;
-  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-family: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
   color: var(--text);
-  background: linear-gradient(120deg, #f8fbff, #f5f7fb 55%);
+  background:
+    radial-gradient(circle at 14% 11%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 34%),
+    radial-gradient(circle at 86% 7%, color-mix(in srgb, var(--accent-2) 18%, transparent), transparent 36%),
+    linear-gradient(165deg, var(--bg), var(--bg-2));
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 24%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
 }
 
 .header {
-  max-width: 1100px;
-  margin: 0 auto 14px;
+  max-width: 1140px;
+  margin: 0 auto 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--shadow);
+  padding: 16px 20px;
+  position: relative;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  right: 20px;
+  top: 12px;
+  width: 120px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
 
 .header h1 {
   margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: clamp(1.55rem, 2vw, 2rem);
+  letter-spacing: 0.02em;
 }
 
 .header p {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
 }
 
 .layout {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: 1.06fr 0.94fr;
+  gap: 12px;
 }
 
 .panel {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
-  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 66%, var(--surface-2)));
+  box-shadow: var(--shadow);
+  padding: 16px;
+  position: relative;
+}
+
+.panel > h2,
+.io-tools h3 {
+  margin: 0 0 8px;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }
 
 .banner {
-  margin-bottom: 10px;
-  border-radius: 8px;
-  padding: 10px 12px;
-  border: 1px solid #b9d3fb;
-  background: #edf4ff;
-  color: #0f4b9a;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 52%, var(--border));
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--surface));
+  color: color-mix(in srgb, var(--accent-2) 70%, var(--text));
 }
 
 .banner.warning {
-  border-color: #ffd8b2;
-  background: #fff6ec;
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -70,7 +150,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 button,
@@ -81,39 +161,46 @@ select {
 
 button {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: 999px;
+  background: var(--surface);
   color: var(--text);
   padding: 8px 12px;
   cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
 button.primary {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
+  font-weight: 700;
 }
 
 button:hover {
-  filter: brightness(0.98);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: var(--outline);
+  outline-offset: 2px;
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .empty-list {
   padding: 16px;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 78%, var(--surface-2));
 }
 
 .reminder-list {
@@ -123,44 +210,45 @@ select:focus-visible {
 
 .reminder-row {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 12px;
+  padding: 12px;
   display: grid;
   gap: 8px;
+  background: var(--surface);
 }
 
 .reminder-row.active {
-  border-color: #b9d3fb;
-  background: #f8fbff;
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: var(--row-active);
 }
 
 .row-main {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
 }
 
 .row-title {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .row-subtitle {
   color: var(--muted);
-  font-size: 0.92rem;
-  margin-top: 2px;
+  font-size: 0.9rem;
+  margin-top: 4px;
 }
 
 .row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
 .row-actions button {
-  padding: 6px 10px;
-  font-size: 0.9rem;
+  padding: 8px 12px;
+  font-size: 0.86rem;
 }
 
 form {
@@ -169,16 +257,18 @@ form {
 }
 
 label {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.92rem;
+  font-weight: 700;
 }
 
 input[type="text"],
 input[type="url"],
 select {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .inline-field {
@@ -189,22 +279,29 @@ select {
 
 .days-fieldset {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 78%, var(--surface-2));
 }
 
 .days-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px 10px;
+  gap: 8px 12px;
 }
 
 .form-error {
-  border: 1px solid #f6c5c3;
-  background: #fff5f5;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
   color: var(--danger);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
 }
 
 .form-actions {
@@ -213,15 +310,12 @@ select {
   gap: 8px;
 }
 
-.io-tools h3 {
-  margin: 0 0 8px;
-}
-
 .io-row {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .hint {
@@ -230,7 +324,13 @@ select {
   font-size: 0.9rem;
 }
 
-@media (max-width: 900px) {
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 940px) {
   body {
     padding: 12px;
   }
