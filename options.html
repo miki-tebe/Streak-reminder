@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Streak Reminders Settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <header class="header">
+      <h1>Streak Reminders Settings</h1>
+      <p>Configure reminder priority, schedule, and import/export data.</p>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <div id="messageBanner" class="banner hidden" role="status"></div>
+        <div id="warningBanner" class="banner warning hidden" role="alert"></div>
+
+        <div class="toolbar">
+          <button id="newReminderButton" type="button">New reminder</button>
+          <button id="templateDuolingo" type="button">+ Duolingo</button>
+          <button id="templateLeetCode" type="button">+ LeetCode</button>
+          <button id="templateGmail" type="button">+ Gmail weekdays</button>
+        </div>
+
+        <div id="emptyList" class="empty-list hidden">No reminders yet. Create one to get started.</div>
+        <div id="reminderList" class="reminder-list" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <h2 id="formTitle">New reminder</h2>
+
+        <form id="reminderForm" novalidate>
+          <input type="hidden" id="reminderId">
+
+          <label for="titleInput">Title</label>
+          <input id="titleInput" type="text" maxlength="120" required>
+
+          <label for="urlInput">URL (http/https)</label>
+          <input id="urlInput" type="url" placeholder="https://example.com" required>
+
+          <label class="inline-field" for="enabledInput">
+            <input id="enabledInput" type="checkbox" checked>
+            Enabled
+          </label>
+
+          <label for="scheduleTypeInput">Schedule</label>
+          <select id="scheduleTypeInput">
+            <option value="daily">Daily</option>
+            <option value="daysOfWeek">Specific days of week</option>
+          </select>
+
+          <fieldset id="daysFieldset" class="days-fieldset hidden">
+            <legend>Days of week</legend>
+            <div class="days-grid">
+              <label><input type="checkbox" value="0">Sun</label>
+              <label><input type="checkbox" value="1">Mon</label>
+              <label><input type="checkbox" value="2">Tue</label>
+              <label><input type="checkbox" value="3">Wed</label>
+              <label><input type="checkbox" value="4">Thu</label>
+              <label><input type="checkbox" value="5">Fri</label>
+              <label><input type="checkbox" value="6">Sat</label>
+            </div>
+          </fieldset>
+
+          <div id="formError" class="form-error hidden" role="alert"></div>
+
+          <div class="form-actions">
+            <button type="submit" class="primary">Save reminder</button>
+            <button type="button" id="resetFormButton">Reset</button>
+          </div>
+        </form>
+
+        <hr>
+
+        <section class="io-tools">
+          <h3>Import / Export</h3>
+          <div class="io-row">
+            <button type="button" id="exportButton">Export JSON</button>
+          </div>
+          <div class="io-row">
+            <input id="importInput" type="file" accept="application/json,.json">
+            <button type="button" id="importButton">Import JSON</button>
+          </div>
+          <p class="hint">Import replaces all reminders. Validation is strict and all-or-nothing.</p>
+        </section>
+      </section>
+    </main>
+
+    <script src="options.js" defer></script>
+  </body>
+</html>

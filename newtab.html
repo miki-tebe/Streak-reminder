@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Streak Reminders</title>
+    <link rel="stylesheet" href="newtab.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <h1>Streak Reminders</h1>
+        <p class="subtitle">Keep your streaks alive with lightweight New Tab nudges.</p>
+      </div>
+      <button id="manageButton" class="ghost-btn" type="button">Manage reminders</button>
+    </header>
+
+    <main class="content" id="appRoot">
+      <section id="errorBanner" class="banner banner-error hidden" role="alert"></section>
+      <section id="infoBanner" class="banner banner-info hidden" role="status"></section>
+      <section id="undoBanner" class="banner banner-info hidden" role="status">
+        <span id="undoText"></span>
+        <button id="undoButton" class="secondary-btn" type="button">Undo</button>
+      </section>
+
+      <section id="primarySection" class="hidden">
+        <h2 class="section-title">Top priority</h2>
+        <div id="primaryContainer"></div>
+      </section>
+
+      <section id="secondarySection" class="hidden">
+        <h2 class="section-title">Up next</h2>
+        <div id="secondaryContainer" class="secondary-list"></div>
+      </section>
+
+      <section id="noDueSection" class="hidden">
+        <div class="empty-state">All streaks done today ✅</div>
+        <div id="allStatusContainer" class="status-list"></div>
+      </section>
+    </main>
+
+    <script src="newtab.js" defer></script>
+  </body>
+</html>
