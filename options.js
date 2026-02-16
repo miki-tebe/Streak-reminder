@@ -1,8 +1,13 @@
 "use strict";
 
 const STORAGE_KEY = "reminders";
+const SETTINGS_KEY = "settings";
+const DEFAULT_SETTINGS = {
+  returnToDefaultNewTabWhenDone: true
+};
 let reminders = [];
 let selectedId = null;
+let extensionSettings = { ...DEFAULT_SETTINGS };
 
 const elements = {
   messageBanner: document.getElementById("messageBanner"),
@@ -25,7 +30,9 @@ const elements = {
   resetFormButton: document.getElementById("resetFormButton"),
   exportButton: document.getElementById("exportButton"),
   importInput: document.getElementById("importInput"),
-  importButton: document.getElementById("importButton")
+  importButton: document.getElementById("importButton"),
+  returnToDefaultNewTabInput: document.getElementById("returnToDefaultNewTabInput"),
+  saveBehaviorButton: document.getElementById("saveBehaviorButton")
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -217,11 +224,23 @@ function wireEvents() {
       showWarning(`Import failed: ${error.message}`);
     }
   });
+
+  elements.saveBehaviorButton.addEventListener("click", async () => {
+    try {
+      extensionSettings.returnToDefaultNewTabWhenDone = elements.returnToDefaultNewTabInput.checked;
+      await saveExtensionSettings(extensionSettings);
+      showMessage("Behavior settings saved.");
+    } catch (error) {
+      showWarning(`Failed to save behavior settings: ${error.message}`);
+    }
+  });
 }
 
 async function initialize() {
   const loaded = await loadRemindersForSettings();
   reminders = loaded.reminders;
+  extensionSettings = await loadExtensionSettings();
+  applySettingsToForm();
   renderReminderList();
 
   if (loaded.issues.length > 0) {
@@ -681,6 +700,41 @@ async function loadRemindersForSettings() {
   return { reminders, issues };
 }
 
+async function loadExtensionSettings() {
+  const raw = await storageGet(SETTINGS_KEY);
+  const sanitized = sanitizeSettings(raw);
+  if (sanitized.changed) {
+    await saveExtensionSettings(sanitized.settings);
+  }
+  return sanitized.settings;
+}
+
+function sanitizeSettings(raw) {
+  if (raw == null) {
+    return { settings: { ...DEFAULT_SETTINGS }, changed: false };
+  }
+
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { settings: { ...DEFAULT_SETTINGS }, changed: true };
+  }
+
+  const returnToDefault =
+    typeof raw.returnToDefaultNewTabWhenDone === "boolean"
+      ? raw.returnToDefaultNewTabWhenDone
+      : DEFAULT_SETTINGS.returnToDefaultNewTabWhenDone;
+
+  const settings = {
+    returnToDefaultNewTabWhenDone: returnToDefault
+  };
+
+  const changed = raw.returnToDefaultNewTabWhenDone !== settings.returnToDefaultNewTabWhenDone;
+  return { settings, changed };
+}
+
+function applySettingsToForm() {
+  elements.returnToDefaultNewTabInput.checked = extensionSettings.returnToDefaultNewTabWhenDone;
+}
+
 function sanitizeLenientReminder(raw, index) {
   if (!raw || typeof raw !== "object") {
     return { valid: false, changed: false, value: null };
@@ -871,6 +925,19 @@ async function storageGet(key) {
 async function saveReminders(nextReminders) {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.set({ [STORAGE_KEY]: nextReminders }, () => {
+      const error = chrome.runtime.lastError;
+      if (error) {
+        reject(new Error(error.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function saveExtensionSettings(nextSettings) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.set({ [SETTINGS_KEY]: nextSettings }, () => {
       const error = chrome.runtime.lastError;
       if (error) {
         reject(new Error(error.message));

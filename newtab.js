@@ -1,9 +1,14 @@
 "use strict";
 
 const STORAGE_KEY = "reminders";
+const SETTINGS_KEY = "settings";
+const DEFAULT_SETTINGS = {
+  returnToDefaultNewTabWhenDone: true
+};
 const dismissedIds = new Set();
 let reminders = [];
 let lastDoneUndo = null;
+let extensionSettings = { ...DEFAULT_SETTINGS };
 
 const elements = {
   manageButton: document.getElementById("manageButton"),
@@ -82,11 +87,36 @@ function wireEvents() {
 }
 
 async function initialize() {
-  const loaded = await loadReminders();
+  const loaded = await loadState();
   reminders = loaded.reminders;
+  extensionSettings = loaded.settings;
+  const today = getTodayLocalYmd();
+  const dow = new Date().getDay();
+  const shouldReturnToDefaultNtp =
+    extensionSettings.returnToDefaultNewTabWhenDone &&
+    shouldUseDefaultNewTab(reminders, today, dow);
+  let needsSave = false;
 
-  if (loaded.changed) {
-    await saveReminders(reminders);
+  if (loaded.changedReminders || loaded.changedSettings) {
+    needsSave = true;
+  }
+
+  const decremented = decrementSnoozeTabs(reminders);
+  if (decremented) {
+    needsSave = true;
+  }
+
+  if (needsSave) {
+    await saveState(reminders, extensionSettings);
+  }
+
+  if (shouldReturnToDefaultNtp) {
+    try {
+      await openBrowserDefaultNewTab();
+      return;
+    } catch (error) {
+      showInfo(`All streaks are done, but auto-return failed: ${error.message}`);
+    }
   }
 
   if (loaded.issues.length > 0) {
@@ -96,11 +126,6 @@ async function initialize() {
   }
 
   render();
-
-  const decremented = decrementSnoozeTabs(reminders);
-  if (decremented) {
-    await saveReminders(reminders);
-  }
 }
 
 async function handleAction(action, reminder, button) {
@@ -352,9 +377,7 @@ function isDue(reminder, today, now, dow) {
     return false;
   }
 
-  const scheduleMatches =
-    reminder.scheduleType === "daily" ||
-    (reminder.scheduleType === "daysOfWeek" && reminder.days.includes(dow));
+  const scheduleMatches = matchesTodaySchedule(reminder, dow);
 
   if (!scheduleMatches) {
     return false;
@@ -375,6 +398,22 @@ function isDue(reminder, today, now, dow) {
   return true;
 }
 
+function shouldUseDefaultNewTab(items, today, dow) {
+  const todaysEnabled = items.filter((item) => item.enabled === true && matchesTodaySchedule(item, dow));
+  if (todaysEnabled.length === 0) {
+    return false;
+  }
+
+  return todaysEnabled.every((item) => item.lastDoneDate === today);
+}
+
+function matchesTodaySchedule(reminder, dow) {
+  return (
+    reminder.scheduleType === "daily" ||
+    (reminder.scheduleType === "daysOfWeek" && reminder.days.includes(dow))
+  );
+}
+
 function decrementSnoozeTabs(items) {
   let changed = false;
   items.forEach((reminder) => {
@@ -386,9 +425,17 @@ function decrementSnoozeTabs(items) {
   return changed;
 }
 
-async function loadReminders() {
-  const raw = await storageGet(STORAGE_KEY);
-  return sanitizeStoredReminders(raw);
+async function loadState() {
+  const raw = await storageGetMany([STORAGE_KEY, SETTINGS_KEY]);
+  const reminderState = sanitizeStoredReminders(raw[STORAGE_KEY]);
+  const settingsState = sanitizeSettings(raw[SETTINGS_KEY]);
+  return {
+    reminders: reminderState.reminders,
+    settings: settingsState.settings,
+    issues: [...reminderState.issues, ...settingsState.issues],
+    changedReminders: reminderState.changed,
+    changedSettings: settingsState.changed
+  };
 }
 
 function sanitizeStoredReminders(raw) {
@@ -430,6 +477,32 @@ function sanitizeStoredReminders(raw) {
   }
 
   return { reminders: normalized, issues, changed };
+}
+
+function sanitizeSettings(raw) {
+  if (raw == null) {
+    return { settings: { ...DEFAULT_SETTINGS }, issues: [], changed: false };
+  }
+
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      settings: { ...DEFAULT_SETTINGS },
+      issues: ["Settings were invalid and have been reset to defaults."],
+      changed: true
+    };
+  }
+
+  const returnToDefault =
+    typeof raw.returnToDefaultNewTabWhenDone === "boolean"
+      ? raw.returnToDefaultNewTabWhenDone
+      : DEFAULT_SETTINGS.returnToDefaultNewTabWhenDone;
+
+  const settings = {
+    returnToDefaultNewTabWhenDone: returnToDefault
+  };
+
+  const changed = raw.returnToDefaultNewTabWhenDone !== settings.returnToDefaultNewTabWhenDone;
+  return { settings, issues: [], changed };
 }
 
 function sanitizeReminder(raw, index) {
@@ -631,6 +704,19 @@ async function storageGet(key) {
   });
 }
 
+async function storageGetMany(keys) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.get(keys, (result) => {
+      const error = chrome.runtime.lastError;
+      if (error) {
+        reject(new Error(error.message));
+        return;
+      }
+      resolve(result);
+    });
+  });
+}
+
 async function saveReminders(nextReminders) {
   await new Promise((resolve, reject) => {
     chrome.storage.sync.set({ [STORAGE_KEY]: nextReminders }, () => {
@@ -644,9 +730,78 @@ async function saveReminders(nextReminders) {
   });
 }
 
+async function saveState(nextReminders, nextSettings) {
+  await new Promise((resolve, reject) => {
+    chrome.storage.sync.set(
+      {
+        [STORAGE_KEY]: nextReminders,
+        [SETTINGS_KEY]: nextSettings
+      },
+      () => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+        resolve();
+      }
+    );
+  });
+}
+
 async function createTab(url) {
   await new Promise((resolve, reject) => {
     chrome.tabs.create({ url }, () => {
+      const error = chrome.runtime.lastError;
+      if (error) {
+        reject(new Error(error.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function openBrowserDefaultNewTab() {
+  const candidates = await getNewTabCandidates();
+  let lastError = null;
+
+  for (const url of candidates) {
+    try {
+      await updateCurrentTab(url);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Unable to open browser New Tab page.");
+}
+
+async function getNewTabCandidates() {
+  const candidates = [];
+  if (await isBraveBrowser()) {
+    // brave://newtab preserves Brave's configured NTP behavior.
+    candidates.push("brave://newtab/", "brave://new-tab-page/");
+  }
+  candidates.push("chrome://newtab/", "chrome://new-tab-page/");
+  return [...new Set(candidates)];
+}
+
+async function isBraveBrowser() {
+  try {
+    if (navigator.brave && typeof navigator.brave.isBrave === "function") {
+      return await navigator.brave.isBrave();
+    }
+  } catch (_error) {
+    // Ignore detection failures and fall back to UA checks below.
+  }
+  return /\bBrave\//i.test(navigator.userAgent);
+}
+
+async function updateCurrentTab(url) {
+  await new Promise((resolve, reject) => {
+    chrome.tabs.update({ url }, () => {
       const error = chrome.runtime.lastError;
       if (error) {
         reject(new Error(error.message));

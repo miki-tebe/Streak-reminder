@@ -5,6 +5,8 @@ Streak Reminders replaces Chrome's New Tab page and shows your highest-priority 
 ## Features
 
 - New Tab override via `chrome_url_overrides`
+- Optional setting: automatically return to the browser's default New Tab page once all reminders scheduled for today are done
+  - In Brave, it prefers `brave://newtab/` so the Brave dashboard page (clock/stats) is restored
 - Priority queue behavior (`rank` ascending)
 - Due logic with local date (`YYYY-MM-DD`) and done-for-today tracking
 - Snooze options:
