@@ -20,7 +20,7 @@ Streak Reminders is a Manifest V3 browser extension that replaces the New Tab pa
 ### 1. Clone the repository
 
 ```bash
-git clone <YOUR_REPO_URL>
+git clone https://github.com/miki-tebe/Streak-reminder.git
 cd "Streak reminder"
 ```
 
