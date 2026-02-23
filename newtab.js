@@ -235,7 +235,7 @@ function render() {
   const primary = due[0];
   elements.primaryContainer.appendChild(createReminderCard(primary, true));
 
-  const secondary = due.slice(1, 3);
+  const secondary = due.slice(1);
   if (secondary.length > 0) {
     elements.secondarySection.classList.remove("hidden");
     secondary.forEach((item) => {
