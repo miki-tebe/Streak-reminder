@@ -2,12 +2,18 @@
 
 const STORAGE_KEY = "reminders";
 const SETTINGS_KEY = "settings";
+const PROGRESS_KEY = "progress";
 const DEFAULT_SETTINGS = {
   returnToDefaultNewTabWhenDone: true
 };
+const ProgressEngine = window.StreakProgressEngine;
+if (!ProgressEngine) {
+  throw new Error("StreakProgressEngine is missing. Ensure progress.js is loaded before options.js.");
+}
 let reminders = [];
 let selectedId = null;
 let extensionSettings = { ...DEFAULT_SETTINGS };
+let streakProgress = null;
 
 const elements = {
   messageBanner: document.getElementById("messageBanner"),
@@ -32,7 +38,11 @@ const elements = {
   importInput: document.getElementById("importInput"),
   importButton: document.getElementById("importButton"),
   returnToDefaultNewTabInput: document.getElementById("returnToDefaultNewTabInput"),
-  saveBehaviorButton: document.getElementById("saveBehaviorButton")
+  saveBehaviorButton: document.getElementById("saveBehaviorButton"),
+  optionsTodayProgressValue: document.getElementById("optionsTodayProgressValue"),
+  optionsCurrentStreakValue: document.getElementById("optionsCurrentStreakValue"),
+  optionsBestStreakValue: document.getElementById("optionsBestStreakValue"),
+  optionsProgressStatus: document.getElementById("optionsProgressStatus")
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -117,9 +127,10 @@ function wireEvents() {
     }
 
     reminders = normalizeRanks(reminders);
-    await saveReminders(reminders);
+    await saveReminderAndProgressState();
 
     renderReminderList();
+    renderProgressSummary();
     if (isEditing) {
       selectReminder(selectedId);
       showMessage("Reminder updated.");
@@ -186,8 +197,9 @@ function wireEvents() {
     }
 
     reminder.enabled = checkbox.checked;
-    await saveReminders(reminders);
+    await saveReminderAndProgressState();
     renderReminderList();
+    renderProgressSummary();
     if (selectedId === id) {
       fillForm(reminder);
     }
@@ -210,9 +222,10 @@ function wireEvents() {
 
       reminders = normalizeRanks(imported);
       selectedId = null;
-      await saveReminders(reminders);
+      await saveReminderAndProgressState();
 
       renderReminderList();
+      renderProgressSummary();
       if (reminders.length > 0) {
         selectReminder(reminders[0].id);
       } else {
@@ -228,7 +241,7 @@ function wireEvents() {
   elements.saveBehaviorButton.addEventListener("click", async () => {
     try {
       extensionSettings.returnToDefaultNewTabWhenDone = elements.returnToDefaultNewTabInput.checked;
-      await saveExtensionSettings(extensionSettings);
+      await saveState(reminders, extensionSettings, streakProgress);
       showMessage("Behavior settings saved.");
     } catch (error) {
       showWarning(`Failed to save behavior settings: ${error.message}`);
@@ -240,6 +253,12 @@ async function initialize() {
   const loaded = await loadRemindersForSettings();
   reminders = loaded.reminders;
   extensionSettings = await loadExtensionSettings();
+  streakProgress = await loadProgressState();
+  const progressChanged = recomputeProgressFromCurrentState(Date.now());
+  if (progressChanged) {
+    await saveState(reminders, extensionSettings, streakProgress);
+  }
+  renderProgressSummary();
   applySettingsToForm();
   renderReminderList();
 
@@ -428,8 +447,9 @@ async function deleteReminder(id) {
     selectedId = null;
   }
 
-  await saveReminders(reminders);
+  await saveReminderAndProgressState();
   renderReminderList();
+  renderProgressSummary();
 
   if (selectedId) {
     selectReminder(selectedId);
@@ -463,8 +483,9 @@ async function moveReminder(id, direction) {
   });
 
   reminders = ordered;
-  await saveReminders(reminders);
+  await saveReminderAndProgressState();
   renderReminderList();
+  renderProgressSummary();
   showMessage("Reminder order updated.");
 }
 
@@ -475,8 +496,9 @@ async function undoDoneReminder(id) {
   }
 
   reminder.lastDoneDate = null;
-  await saveReminders(reminders);
+  await saveReminderAndProgressState();
   renderReminderList();
+  renderProgressSummary();
   if (selectedId === id) {
     fillForm(reminder);
   }
@@ -489,8 +511,9 @@ async function createTemplateReminder(templateName) {
   reminders = normalizeRanks(reminders);
 
   try {
-    await saveReminders(reminders);
+    await saveReminderAndProgressState();
     renderReminderList();
+    renderProgressSummary();
     selectReminder(template.id);
     showMessage(`Template added: ${template.title}`);
   } catch (error) {
@@ -709,6 +732,15 @@ async function loadExtensionSettings() {
   return sanitized.settings;
 }
 
+async function loadProgressState() {
+  const raw = await storageGet(PROGRESS_KEY);
+  const sanitized = ProgressEngine.sanitizeProgress(raw, getTodayLocalYmd());
+  if (sanitized.changed) {
+    await saveProgress(sanitized.progress);
+  }
+  return sanitized.progress;
+}
+
 function sanitizeSettings(raw) {
   if (raw == null) {
     return { settings: { ...DEFAULT_SETTINGS }, changed: false };
@@ -733,6 +765,43 @@ function sanitizeSettings(raw) {
 
 function applySettingsToForm() {
   elements.returnToDefaultNewTabInput.checked = extensionSettings.returnToDefaultNewTabWhenDone;
+}
+
+function recomputeProgressFromCurrentState(nowMs = Date.now()) {
+  const todayYmd = getTodayLocalYmd(new Date(nowMs));
+  const before = JSON.stringify(streakProgress);
+  streakProgress = ProgressEngine.reconcileDayRollover(streakProgress, reminders, todayYmd);
+  const todayProgress = ProgressEngine.getTodayProgress(reminders, nowMs);
+  streakProgress = ProgressEngine.applyTodayProgress(streakProgress, todayProgress);
+  return JSON.stringify(streakProgress) !== before;
+}
+
+function renderProgressSummary() {
+  if (!streakProgress) {
+    return;
+  }
+  const today = streakProgress.today || {
+    requiredCount: 0,
+    doneCount: 0,
+    status: "neutral"
+  };
+
+  elements.optionsTodayProgressValue.textContent = `${today.doneCount}/${today.requiredCount}`;
+  elements.optionsCurrentStreakValue.textContent = String(streakProgress.currentStreak);
+  elements.optionsBestStreakValue.textContent = String(streakProgress.bestStreak);
+  elements.optionsProgressStatus.textContent = getProgressStatusLabel(today.status);
+  elements.optionsProgressStatus.dataset.status = today.status;
+}
+
+function getProgressStatusLabel(status) {
+  switch (status) {
+    case "complete":
+      return "Complete today";
+    case "incomplete":
+      return "In progress";
+    default:
+      return "Neutral day";
+  }
 }
 
 function sanitizeLenientReminder(raw, index) {
@@ -935,6 +1004,19 @@ async function saveReminders(nextReminders) {
   });
 }
 
+async function saveProgress(nextProgress) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.set({ [PROGRESS_KEY]: nextProgress }, () => {
+      const error = chrome.runtime.lastError;
+      if (error) {
+        reject(new Error(error.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 async function saveExtensionSettings(nextSettings) {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.set({ [SETTINGS_KEY]: nextSettings }, () => {
@@ -946,6 +1028,34 @@ async function saveExtensionSettings(nextSettings) {
       resolve();
     });
   });
+}
+
+async function saveState(nextReminders, nextSettings, nextProgress) {
+  const safeProgress =
+    nextProgress ||
+    ProgressEngine.sanitizeProgress(null, getTodayLocalYmd()).progress;
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.set(
+      {
+        [STORAGE_KEY]: nextReminders,
+        [SETTINGS_KEY]: nextSettings,
+        [PROGRESS_KEY]: safeProgress
+      },
+      () => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+        resolve();
+      }
+    );
+  });
+}
+
+async function saveReminderAndProgressState(nowMs = Date.now()) {
+  recomputeProgressFromCurrentState(nowMs);
+  await saveState(reminders, extensionSettings, streakProgress);
 }
 
 function showMessage(message) {

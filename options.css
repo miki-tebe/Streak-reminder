@@ -146,6 +146,71 @@ body::before {
   color: var(--warning);
 }
 
+.progress-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 78%, var(--surface-2));
+  margin-bottom: 12px;
+}
+
+.progress-panel h2 {
+  margin: 0 0 8px;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-size: 1.1rem;
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.progress-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--surface);
+  display: grid;
+  gap: 4px;
+}
+
+.progress-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.progress-value {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+
+.progress-status {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.progress-status[data-status="complete"] {
+  border-color: color-mix(in srgb, var(--accent-2) 52%, var(--border));
+  background: color-mix(in srgb, var(--accent-2) 14%, var(--surface));
+}
+
+.progress-status[data-status="incomplete"] {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+
+.progress-status[data-status="neutral"] {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface) 68%, var(--surface-2));
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -341,5 +406,9 @@ hr {
 
   .days-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .progress-grid {
+    grid-template-columns: 1fr;
   }
 }

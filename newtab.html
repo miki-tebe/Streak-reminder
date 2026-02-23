@@ -8,9 +8,27 @@
   </head>
   <body>
     <header class="page-header">
-      <div>
+      <div class="header-main">
         <h1>Streak Reminders</h1>
         <p class="subtitle">Keep your streaks alive with lightweight New Tab nudges.</p>
+        <section class="streak-summary" aria-live="polite">
+          <article class="streak-pill">
+            <span class="streak-label">Today</span>
+            <strong id="todayProgressValue" class="streak-value">0/0</strong>
+          </article>
+          <article class="streak-pill">
+            <span class="streak-label">Current streak</span>
+            <strong id="currentStreakValue" class="streak-value">0</strong>
+          </article>
+          <article class="streak-pill">
+            <span class="streak-label">Best streak</span>
+            <strong id="bestStreakValue" class="streak-value">0</strong>
+          </article>
+          <article id="todayStatusBadge" class="streak-pill streak-status" data-status="neutral">
+            <span class="streak-label">Status</span>
+            <strong id="todayStatusValue" class="streak-value">Neutral day</strong>
+          </article>
+        </section>
       </div>
       <button id="manageButton" class="ghost-btn" type="button">Manage reminders</button>
     </header>
@@ -39,6 +57,7 @@
       </section>
     </main>
 
+    <script src="progress.js" defer></script>
     <script src="newtab.js" defer></script>
   </body>
 </html>

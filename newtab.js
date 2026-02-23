@@ -2,13 +2,19 @@
 
 const STORAGE_KEY = "reminders";
 const SETTINGS_KEY = "settings";
+const PROGRESS_KEY = "progress";
 const DEFAULT_SETTINGS = {
   returnToDefaultNewTabWhenDone: true
 };
+const ProgressEngine = window.StreakProgressEngine;
+if (!ProgressEngine) {
+  throw new Error("StreakProgressEngine is missing. Ensure progress.js is loaded before newtab.js.");
+}
 const dismissedIds = new Set();
 let reminders = [];
 let lastDoneUndo = null;
 let extensionSettings = { ...DEFAULT_SETTINGS };
+let streakProgress = null;
 
 const elements = {
   manageButton: document.getElementById("manageButton"),
@@ -17,6 +23,11 @@ const elements = {
   undoBanner: document.getElementById("undoBanner"),
   undoText: document.getElementById("undoText"),
   undoButton: document.getElementById("undoButton"),
+  todayProgressValue: document.getElementById("todayProgressValue"),
+  currentStreakValue: document.getElementById("currentStreakValue"),
+  bestStreakValue: document.getElementById("bestStreakValue"),
+  todayStatusValue: document.getElementById("todayStatusValue"),
+  todayStatusBadge: document.getElementById("todayStatusBadge"),
   primarySection: document.getElementById("primarySection"),
   secondarySection: document.getElementById("secondarySection"),
   noDueSection: document.getElementById("noDueSection"),
@@ -52,9 +63,11 @@ function wireEvents() {
       reminder.lastDoneDate = lastDoneUndo.previous.lastDoneDate;
       reminder.snoozeUntil = lastDoneUndo.previous.snoozeUntil;
       reminder.snoozeTabsRemaining = lastDoneUndo.previous.snoozeTabsRemaining;
-      await saveReminders(reminders);
+      recomputeProgressFromCurrentState(Date.now());
+      await saveState(reminders, extensionSettings, streakProgress);
       clearUndoState();
       render();
+      renderProgressSummary();
       showInfo(`Undid done action for "${reminder.title}".`);
     } catch (error) {
       showError(`Undo failed: ${error.message}`);
@@ -90,15 +103,35 @@ async function initialize() {
   const loaded = await loadState();
   reminders = loaded.reminders;
   extensionSettings = loaded.settings;
-  const today = getTodayLocalYmd();
-  const dow = new Date().getDay();
+  streakProgress = loaded.progress;
+  const nowMs = Date.now();
+  const nowDate = new Date(nowMs);
+  const today = getTodayLocalYmd(nowDate);
+  const dow = nowDate.getDay();
+  let needsSave = false;
+
+  if (loaded.changedReminders || loaded.changedSettings || loaded.changedProgress) {
+    needsSave = true;
+  }
+
+  const progressChanged = recomputeProgressFromCurrentState(nowMs);
+  if (progressChanged) {
+    needsSave = true;
+  }
+
   const shouldReturnToDefaultNtp =
     extensionSettings.returnToDefaultNewTabWhenDone &&
     shouldUseDefaultNewTab(reminders, today, dow);
-  let needsSave = false;
 
-  if (loaded.changedReminders || loaded.changedSettings) {
-    needsSave = true;
+  if (loaded.issues.length > 0) {
+    showInfo(loaded.issues.join(" "));
+  } else {
+    hideInfo();
+  }
+
+  if (!shouldReturnToDefaultNtp) {
+    render();
+    renderProgressSummary();
   }
 
   const decremented = decrementSnoozeTabs(reminders);
@@ -107,7 +140,7 @@ async function initialize() {
   }
 
   if (needsSave) {
-    await saveState(reminders, extensionSettings);
+    await saveState(reminders, extensionSettings, streakProgress);
   }
 
   if (shouldReturnToDefaultNtp) {
@@ -116,16 +149,10 @@ async function initialize() {
       return;
     } catch (error) {
       showInfo(`All streaks are done, but auto-return failed: ${error.message}`);
+      render();
+      renderProgressSummary();
     }
   }
-
-  if (loaded.issues.length > 0) {
-    showInfo(loaded.issues.join(" "));
-  } else {
-    hideInfo();
-  }
-
-  render();
 }
 
 async function handleAction(action, reminder, button) {
@@ -193,8 +220,10 @@ async function handleAction(action, reminder, button) {
       return;
   }
 
-  await saveReminders(reminders);
+  recomputeProgressFromCurrentState(now);
+  await saveState(reminders, extensionSettings, streakProgress);
   render();
+  renderProgressSummary();
   if (action === "done") {
     updateUndoBanner();
   }
@@ -243,6 +272,46 @@ function render() {
     });
   } else {
     elements.secondarySection.classList.add("hidden");
+  }
+}
+
+function recomputeProgressFromCurrentState(nowMs = Date.now()) {
+  const todayYmd = getTodayLocalYmd(new Date(nowMs));
+  const before = JSON.stringify(streakProgress);
+  streakProgress = ProgressEngine.reconcileDayRollover(streakProgress, reminders, todayYmd);
+  const todayProgress = ProgressEngine.getTodayProgress(reminders, nowMs);
+  streakProgress = ProgressEngine.applyTodayProgress(streakProgress, todayProgress);
+  return JSON.stringify(streakProgress) !== before;
+}
+
+function renderProgressSummary() {
+  if (!streakProgress) {
+    return;
+  }
+
+  const today = streakProgress.today || {
+    requiredCount: 0,
+    doneCount: 0,
+    status: "neutral"
+  };
+
+  elements.todayProgressValue.textContent = `${today.doneCount}/${today.requiredCount}`;
+  elements.currentStreakValue.textContent = String(streakProgress.currentStreak);
+  elements.bestStreakValue.textContent = String(streakProgress.bestStreak);
+
+  const statusLabel = getProgressStatusLabel(today.status);
+  elements.todayStatusValue.textContent = statusLabel;
+  elements.todayStatusBadge.dataset.status = today.status;
+}
+
+function getProgressStatusLabel(status) {
+  switch (status) {
+    case "complete":
+      return "Complete today";
+    case "incomplete":
+      return "In progress";
+    default:
+      return "Neutral day";
   }
 }
 
@@ -426,15 +495,19 @@ function decrementSnoozeTabs(items) {
 }
 
 async function loadState() {
-  const raw = await storageGetMany([STORAGE_KEY, SETTINGS_KEY]);
+  const raw = await storageGetMany([STORAGE_KEY, SETTINGS_KEY, PROGRESS_KEY]);
+  const todayYmd = getTodayLocalYmd();
   const reminderState = sanitizeStoredReminders(raw[STORAGE_KEY]);
   const settingsState = sanitizeSettings(raw[SETTINGS_KEY]);
+  const progressState = ProgressEngine.sanitizeProgress(raw[PROGRESS_KEY], todayYmd);
   return {
     reminders: reminderState.reminders,
     settings: settingsState.settings,
-    issues: [...reminderState.issues, ...settingsState.issues],
+    progress: progressState.progress,
+    issues: [...reminderState.issues, ...settingsState.issues, ...progressState.issues],
     changedReminders: reminderState.changed,
-    changedSettings: settingsState.changed
+    changedSettings: settingsState.changed,
+    changedProgress: progressState.changed
   };
 }
 
@@ -730,12 +803,16 @@ async function saveReminders(nextReminders) {
   });
 }
 
-async function saveState(nextReminders, nextSettings) {
+async function saveState(nextReminders, nextSettings, nextProgress) {
+  const safeProgress =
+    nextProgress ||
+    ProgressEngine.sanitizeProgress(null, getTodayLocalYmd()).progress;
   await new Promise((resolve, reject) => {
     chrome.storage.sync.set(
       {
         [STORAGE_KEY]: nextReminders,
-        [SETTINGS_KEY]: nextSettings
+        [SETTINGS_KEY]: nextSettings,
+        [PROGRESS_KEY]: safeProgress
       },
       () => {
         const error = chrome.runtime.lastError;

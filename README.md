@@ -6,6 +6,7 @@ Streak Reminders is a Manifest V3 browser extension that replaces the New Tab pa
 
 - New Tab override with priority-queue behavior (`rank` ascending)
 - Done-for-today tracking (`YYYY-MM-DD`, local time)
+- Global streak progress tracking (“streak for your streaks”)
 - Snooze options: 1 hour, 3 hours, tomorrow at 09:00, or next 5 tabs
 - Undo for accidental `Done` actions
 - Optional auto-return to browser default New Tab when all due streaks are done
@@ -63,6 +64,29 @@ All reminders are stored in `chrome.storage.sync` under key `reminders`:
 }
 ```
 
+Global streak state is stored under key `progress`:
+
+```json
+{
+  "version": 1,
+  "trackingStartedDate": "YYYY-MM-DD",
+  "lastSeenDate": "YYYY-MM-DD",
+  "currentStreak": 0,
+  "bestStreak": 0,
+  "lastCompletedDueDate": null,
+  "today": {
+    "date": "YYYY-MM-DD",
+    "requiredCount": 0,
+    "doneCount": 0,
+    "status": "neutral",
+    "contributed": false,
+    "prevCurrentStreak": 0,
+    "prevBestStreak": 0,
+    "prevLastCompletedDueDate": null
+  }
+}
+```
+
 ## Due Logic
 
 A reminder is due when all are true:
@@ -72,6 +96,25 @@ A reminder is due when all are true:
 - `lastDoneDate !== today` (local date)
 - `snoozeUntil` is null or in the past
 - `snoozeTabsRemaining` is null or `<= 0`
+
+## Streak Progress Logic
+
+The extension tracks a **global streak** across all due reminders.
+
+- Required set for today:
+  - reminder is enabled
+  - schedule matches today
+  - reminder is not deferred right now (`snoozeUntil` in future or `snoozeTabsRemaining > 0` excludes it)
+- Today status:
+  - `neutral`: no required reminders
+  - `incomplete`: required reminders exist, but not all done
+  - `complete`: all required reminders are done today
+- Streak behavior:
+  - Streak increments immediately when today becomes `complete`
+  - If the user later undoes/snoozes and today becomes non-complete, the same-day contribution is revoked
+  - Neutral days do not increment or break streak
+  - Missed due days between app opens reset current streak
+- Tracking starts when this feature is first seen by the extension (no historical backfill)
 
 ## Import / Export
 

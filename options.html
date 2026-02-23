@@ -17,6 +17,25 @@
         <div id="messageBanner" class="banner hidden" role="status"></div>
         <div id="warningBanner" class="banner warning hidden" role="alert"></div>
 
+        <section class="progress-panel" aria-live="polite">
+          <h2>Streak Progress</h2>
+          <div class="progress-grid">
+            <div class="progress-item">
+              <span class="progress-label">Today</span>
+              <strong id="optionsTodayProgressValue" class="progress-value">0/0</strong>
+            </div>
+            <div class="progress-item">
+              <span class="progress-label">Current streak</span>
+              <strong id="optionsCurrentStreakValue" class="progress-value">0</strong>
+            </div>
+            <div class="progress-item">
+              <span class="progress-label">Best streak</span>
+              <strong id="optionsBestStreakValue" class="progress-value">0</strong>
+            </div>
+          </div>
+          <p id="optionsProgressStatus" class="progress-status" data-status="neutral">Neutral day</p>
+        </section>
+
         <div class="toolbar">
           <button id="newReminderButton" type="button">New reminder</button>
           <button id="templateDuolingo" type="button">+ Duolingo</button>
@@ -102,6 +121,7 @@
       </section>
     </main>
 
+    <script src="progress.js" defer></script>
     <script src="options.js" defer></script>
   </body>
 </html>
